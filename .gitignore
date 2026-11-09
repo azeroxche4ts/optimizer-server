@@ -17,6 +17,8 @@ licenses.db-journal
 licenses.db-wal
 licenses.db-shm
 tests/*.db*
+tests/*-seed.json*
+*.backup
 
 
 # Build artifacts

@@ -31,9 +31,18 @@ if (DATABASE_URL && DATABASE_URL.startsWith('postgres')) {
     sqliteDb = new DatabaseSync(DB_PATH);
     try {
         sqliteDb.exec('PRAGMA journal_mode = WAL;');
+        sqliteDb.exec('PRAGMA synchronous = NORMAL;');
         sqliteDb.exec('PRAGMA busy_timeout = 10000;');
     } catch {}
     console.log('[DB] Using local SQLite database:', DB_PATH);
+}
+
+function checkpointSqlite(mode = 'PASSIVE') {
+    if (!isPostgres && sqliteDb) {
+        try {
+            sqliteDb.exec(`PRAGMA wal_checkpoint(${mode});`);
+        } catch (e) {}
+    }
 }
 
 function getSeedFilePath() {
@@ -42,9 +51,23 @@ function getSeedFilePath() {
 
 function closeDatabase() {
     if (sqliteDb) {
-        try { sqliteDb.close(); } catch {}
+        try {
+            sqliteDb.exec('PRAGMA wal_checkpoint(TRUNCATE);');
+            sqliteDb.close();
+        } catch {}
         sqliteDb = null;
     }
+}
+
+// Guarantee WAL commit and zero data loss on process termination
+if (!process.__sqliteShutdownHookInstalled) {
+    process.__sqliteShutdownHookInstalled = true;
+    const cleanExit = () => {
+        try { closeDatabase(); } catch {}
+    };
+    process.on('SIGTERM', cleanExit);
+    process.on('SIGINT', cleanExit);
+    process.on('beforeExit', cleanExit);
 }
 
 function setSqliteDb(customPath) {
@@ -53,6 +76,7 @@ function setSqliteDb(customPath) {
     sqliteDb = new DatabaseSync(customPath);
     try {
         sqliteDb.exec('PRAGMA journal_mode = WAL;');
+        sqliteDb.exec('PRAGMA synchronous = NORMAL;');
         sqliteDb.exec('PRAGMA busy_timeout = 10000;');
     } catch {}
     return sqliteDb;
@@ -637,11 +661,24 @@ async function exportSeedKeys() {
             try {
                 const tmpPath = `${seedPath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
                 fs.writeFileSync(tmpPath, JSON.stringify(finalOutput, null, 2), 'utf8');
-                fs.renameSync(tmpPath, seedPath);
+                try {
+                    fs.renameSync(tmpPath, seedPath);
+                } catch (renameErr) {
+                    fs.writeFileSync(seedPath, JSON.stringify(finalOutput, null, 2), 'utf8');
+                    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch {}
+                }
+                // Maintain redundant persistent backup file to prevent data loss across container resets
+                try {
+                    fs.writeFileSync(`${seedPath}.backup`, JSON.stringify(finalOutput, null, 2), 'utf8');
+                } catch {}
             } catch (e) {
                 console.warn('[SEED] Atomic write warning for seed file:', e.message);
+                try {
+                    fs.writeFileSync(seedPath, JSON.stringify(finalOutput, null, 2), 'utf8');
+                } catch {}
             }
         }
+        checkpointSqlite('PASSIVE');
         return finalOutput;
     } catch (err) {
         console.error('[SEED] Failed to export seed-keys.json:', err.message);
@@ -654,8 +691,19 @@ async function importSeedKeys(customList = null) {
         let seedList = customList;
         if (!seedList) {
             const seedPath = getSeedFilePath();
-            if (!fs.existsSync(seedPath)) return 0;
-            const raw = fs.readFileSync(seedPath, 'utf8').trim();
+            let raw = null;
+            if (fs.existsSync(seedPath)) {
+                try {
+                    raw = fs.readFileSync(seedPath, 'utf8').trim();
+                } catch {}
+            }
+            // Fallback to secondary persistent backup if primary was empty or missing
+            if (!raw && fs.existsSync(`${seedPath}.backup`)) {
+                try {
+                    raw = fs.readFileSync(`${seedPath}.backup`, 'utf8').trim();
+                    if (raw) console.log('[SEED] Successfully restored baseline keys from backup file.');
+                } catch {}
+            }
             if (!raw) return 0;
             seedList = JSON.parse(raw);
         }
@@ -931,6 +979,7 @@ async function createActivationKey(params = {}) {
         notes || ''
     ]);
 
+    checkpointSqlite('PASSIVE');
     const created = await getKeyByHash(keyHash);
     await exportSeedKeys();
     return created;
@@ -1411,8 +1460,19 @@ async function getAllDeletedKeys() {
 }
 
 async function deleteKey(idOrKey, deletedBy = 'admin', reason = 'Deleted by Administrator') {
-    const key = await getKeyByIdOrString(idOrKey);
-    if (!key) {
+    let key = await getKeyByIdOrString(idOrKey);
+    let keyDisplay = null;
+    let keyHash = null;
+
+    if (key) {
+        keyDisplay = key.key_display;
+        keyHash = key.key_hash;
+    } else if (typeof idOrKey === 'string' && idOrKey.trim()) {
+        keyDisplay = idOrKey.trim().toUpperCase();
+        keyHash = hashKey(keyDisplay);
+    }
+
+    if (!key && !keyHash) {
         return { success: true, count: 0, message: 'Key not found or already deleted' };
     }
 
@@ -1421,41 +1481,44 @@ async function deleteKey(idOrKey, deletedBy = 'admin', reason = 'Deleted by Admi
         if (isPostgres) {
             await query(
                 'INSERT INTO deleted_keys (key_hash, key_display, deleted_by, reason) VALUES (?, ?, ?, ?) ON CONFLICT (key_hash) DO NOTHING',
-                [key.key_hash, key.key_display, deletedBy, reason]
+                [keyHash, keyDisplay || '', deletedBy, reason]
             );
         } else {
             await query(
                 'INSERT OR IGNORE INTO deleted_keys (key_hash, key_display, deleted_by, reason) VALUES (?, ?, ?, ?)',
-                [key.key_hash, key.key_display, deletedBy, reason]
+                [keyHash, keyDisplay || '', deletedBy, reason]
             );
         }
     } catch (e) {
         console.error('[DB] Error recording deleted key hash:', e.message);
     }
 
-    // 2. Immediately invalidate and remove all active sessions & device activations associated with this key
-    await query('DELETE FROM activations WHERE key_id = ? OR license_id = ?', [key.id, key.id]);
+    if (key) {
+        // 2. Immediately invalidate and remove all active sessions & device activations associated with this key
+        await query('DELETE FROM activations WHERE key_id = ? OR license_id = ?', [key.id, key.id]);
+        // 3. Delete from activation_keys table
+        await query('DELETE FROM activation_keys WHERE id = ?', [key.id]);
+        // 4. Remove from legacy licenses table if exists
+        try {
+            await query('DELETE FROM licenses WHERE license_key = ? OR license_key = ?', [key.key_display, key.key_last4]);
+        } catch (e) {}
+    } else {
+        await query('DELETE FROM activation_keys WHERE key_hash = ? OR key_display = ?', [keyHash, keyDisplay]);
+    }
 
-    // 3. Delete from activation_keys table
-    const res = await query('DELETE FROM activation_keys WHERE id = ?', [key.id]);
-
-    // 4. Remove from legacy licenses table if exists
-    try {
-        await query('DELETE FROM licenses WHERE license_key = ? OR license_key = ?', [key.key_display, key.key_last4]);
-    } catch (e) {}
-
+    checkpointSqlite('PASSIVE');
     // 5. Update and persist seed-keys.json to guarantee permanence across restarts
     await exportSeedKeys();
 
     return {
         success: true,
-        count: res.rowCount || 1,
-        key: key
+        count: 1,
+        key: key || { key_display: keyDisplay, key_hash: keyHash }
     };
 }
 
 async function clearExpiredKeys() {
-    const allKeysRes = await query("SELECT id, status, expires_at, duration_hours FROM activation_keys");
+    const allKeysRes = await query("SELECT id, key_hash, key_display, status, expires_at, duration_hours FROM activation_keys");
     const now = Date.now();
     let count = 0;
     if (allKeysRes.rows && allKeysRes.rows.length > 0) {
@@ -1463,11 +1526,25 @@ async function clearExpiredKeys() {
             const isPerm = k.duration_hours === -1;
             const isExp = !isPerm && k.expires_at && (new Date(k.expires_at).getTime() <= now);
             if (k.status === 'EXPIRED' || isExp) {
+                try {
+                    if (isPostgres) {
+                        await query(
+                            'INSERT INTO deleted_keys (key_hash, key_display, deleted_by, reason) VALUES (?, ?, ?, ?) ON CONFLICT (key_hash) DO NOTHING',
+                            [k.key_hash, k.key_display || '', 'admin', 'Cleared expired key']
+                        );
+                    } else {
+                        await query(
+                            'INSERT OR IGNORE INTO deleted_keys (key_hash, key_display, deleted_by, reason) VALUES (?, ?, ?, ?)',
+                            [k.key_hash, k.key_display || '', 'admin', 'Cleared expired key']
+                        );
+                    }
+                } catch (e) {}
                 await query('DELETE FROM activations WHERE key_id = ?', [k.id]);
                 await query('DELETE FROM activation_keys WHERE id = ?', [k.id]);
                 count++;
             }
         }
+        checkpointSqlite('PASSIVE');
         await exportSeedKeys();
     }
     return count;

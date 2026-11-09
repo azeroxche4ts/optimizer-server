@@ -832,6 +832,7 @@
             </div>
 
             <div id="authNavArea" class="user-nav-actions" style="display: none;">
+                <span class="user-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 11px;" title="Server is protected with 24/7 Keep-Alive & Persistent Storage">● 24/7 Active</span>
                 <span class="user-badge" id="navUserBadge">Admin</span>
                 <button class="btn btn-outline btn-sm" onclick="handleLogout()">Sign Out</button>
             </div>
@@ -1059,6 +1060,15 @@
                             <input type="text" id="searchKeysInput" class="search-input" placeholder="Search key, customer, notes..." oninput="handleSearch()">
                         </div>
 
+                        <button class="btn btn-outline btn-sm" onclick="downloadKeysBackup()" title="Download Persistent JSON Backup" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Backup Keys
+                        </button>
+
                         <button class="btn btn-outline btn-sm" onclick="loadKeysData()" title="Refresh">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
@@ -1078,7 +1088,7 @@
                 <!-- Current Dashboard Notice in Keys List -->
                 <div style="margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--text-secondary); background: var(--bg-surface-variant); padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-color);">
                     <span>Active Dashboard: <b id="totalKeysCurrentProductLabel" style="color: #93c5fd;">OPTIMIZER Keys</b></span>
-                    <span style="font-size: 11px; opacity: 0.7;">Switch tabs at top to toggle dashboard</span>
+                    <span style="font-size: 11px; opacity: 0.7;">Server Key Management</span>
                 </div>
 
                 <!-- Filter Chips Row -->
@@ -1458,21 +1468,39 @@
 
         const TOKEN_STORAGE_KEY = 'azerox_admin_token';
         const USERNAME_STORAGE_KEY = 'azerox_admin_username';
+        const LATEST_KEY_STORAGE_KEY = 'azerox_optimizer_latest_key_v2';
+        const ALL_KEYS_STORAGE_KEY = 'azerox_optimizer_all_keys_v2';
 
-        // Purge any stale client-side key storage so server is the single source of truth
+        // Load cached persistent keys immediately so newly created keys NEVER disappear on reload or restart
         try {
-            localStorage.removeItem('optimizer_admin_latest_key_v1');
-            localStorage.removeItem('optimizer_admin_all_keys_v1');
-            sessionStorage.removeItem('optimizer_admin_latest_key_v1');
-            sessionStorage.removeItem('optimizer_admin_all_keys_v1');
+            const cachedLatest = localStorage.getItem(LATEST_KEY_STORAGE_KEY);
+            if (cachedLatest) {
+                const parsed = JSON.parse(cachedLatest);
+                if (parsed && (parsed.key_display || parsed.key)) latestKeyData = parsed;
+            }
+        } catch (e) {}
+
+        try {
+            const cachedAll = localStorage.getItem(ALL_KEYS_STORAGE_KEY);
+            if (cachedAll) {
+                const parsed = JSON.parse(cachedAll);
+                if (Array.isArray(parsed) && parsed.length > 0) allKeys = parsed;
+            }
         } catch (e) {}
 
         function saveLatestKey(k) {
             latestKeyData = k;
+            try {
+                if (k) localStorage.setItem(LATEST_KEY_STORAGE_KEY, JSON.stringify(k));
+                else localStorage.removeItem(LATEST_KEY_STORAGE_KEY);
+            } catch (e) {}
         }
 
         function saveAllKeys(keys) {
             allKeys = Array.isArray(keys) ? keys : [];
+            try {
+                localStorage.setItem(ALL_KEYS_STORAGE_KEY, JSON.stringify(allKeys));
+            } catch (e) {}
         }
 
         // --- REAL-TIME SERVER-SENT EVENTS (SSE) & POLLING FALLBACK ---
@@ -1769,6 +1797,14 @@
             const user = username || getUsername() || 'AZEROX';
             document.getElementById('navUserBadge').innerText = user;
 
+            // Render cached keys immediately so newly created keys NEVER disappear on reload
+            if (latestKeyData) renderLatestKey(latestKeyData);
+            if (allKeys && allKeys.length > 0) {
+                renderKeysList();
+                renderHistoryList();
+                updateStatsForCurrentDashboard();
+            }
+
             initOptimizerDashboard();
 
             loadKeysData();
@@ -1893,8 +1929,11 @@
         }
 
         function syncLatestKeyForCurrentDashboard() {
-            if (allKeys.length > 0) {
+            if (latestKeyData) {
+                renderLatestKey(latestKeyData);
+            } else if (allKeys.length > 0) {
                 latestKeyData = allKeys[0];
+                saveLatestKey(latestKeyData);
                 renderLatestKey(latestKeyData);
             } else {
                 latestKeyData = null;
@@ -1983,11 +2022,11 @@
                 });
 
                 if (res.success && (res.key || (res.keys && res.keys[0]))) {
-                    const generated = res.key ? res : res.keys[0];
+                    const generated = (res.keys && res.keys[0]) ? res.keys[0] : (typeof res.key === 'object' ? res.key : res);
                     latestKeyData = {
                         id: generated.id,
-                        key_display: generated.key || generated.key_display,
-                        product_name: generated.product_name || currentDashboard,
+                        key_display: generated.key_display || generated.key,
+                        product_name: generated.product_name || generated.product || currentDashboard,
                         status: generated.status || 'UNUSED',
                         duration_hours: generated.duration_hours,
                         created_at: generated.created_at || new Date().toISOString(),
@@ -2000,7 +2039,20 @@
 
                     saveLatestKey(latestKeyData);
                     renderLatestKey(latestKeyData);
-                    showToast('Key generated successfully!');
+
+                    // Prepend to allKeys list immediately so it appears across dashboard tabs
+                    const existingIdx = allKeys.findIndex(k => String(k.id) === String(latestKeyData.id) || k.key_display === latestKeyData.key_display);
+                    if (existingIdx !== -1) {
+                        allKeys[existingIdx] = { ...allKeys[existingIdx], ...latestKeyData };
+                    } else {
+                        allKeys.unshift(latestKeyData);
+                    }
+                    saveAllKeys(allKeys);
+                    renderKeysList();
+                    renderHistoryList();
+                    updateStatsForCurrentDashboard();
+
+                    showToast('Key generated successfully! Saved to persistent storage.');
                     loadStatsData();
                     loadKeysData();
                     openKeyDetails(latestKeyData);
@@ -2212,16 +2264,54 @@
             try {
                 const res = await api('/api/keys?limit=250');
                 if (res.success && Array.isArray(res.keys)) {
-                    allKeys = res.keys;
+                    const serverKeys = res.keys;
+                    // Preserve any newly created key details from local cache
+                    if (latestKeyData) {
+                        const inServer = serverKeys.find(k => String(k.id) === String(latestKeyData.id) || k.key_display === latestKeyData.key_display);
+                        if (inServer) {
+                            latestKeyData = { ...latestKeyData, ...inServer };
+                        }
+                    }
+                    allKeys = serverKeys;
                     saveAllKeys(allKeys);
+                    if (!latestKeyData && allKeys.length > 0) {
+                        latestKeyData = allKeys[0];
+                    }
+                    saveLatestKey(latestKeyData);
 
                     updateStatsForCurrentDashboard();
                     syncLatestKeyForCurrentDashboard();
                     renderKeysList();
                     renderHistoryList();
+                    updateLiveCountdowns();
                 }
             } catch (err) {
-                console.error('Keys error:', err);
+                console.warn('Background key refresh notice:', err.message);
+                if (allKeys.length > 0) {
+                    renderKeysList();
+                    renderHistoryList();
+                    updateStatsForCurrentDashboard();
+                }
+            }
+        }
+
+        async function downloadKeysBackup() {
+            try {
+                const res = await api('/api/keys/export');
+                if (res && res.keys) {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.keys, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `optimizer-keys-${new Date().toISOString().slice(0, 10)}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                    showToast('✓ Persistent JSON backup downloaded successfully');
+                } else {
+                    showToast('Could not export keys from server');
+                }
+            } catch (e) {
+                showToast('Backup notice: ' + e.message);
             }
         }
 
@@ -2276,6 +2366,7 @@
 
             container.innerHTML = filtered.map(k => {
                 const status = computeKeyStatus(k);
+                const isPerm = (k.duration_hours === -1);
                 let validityText = '';
                 let dataAttr = '';
 

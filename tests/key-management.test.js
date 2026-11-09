@@ -501,4 +501,84 @@ test('Key Management & UI Test Suite', async (t) => {
 
         await db.deleteKey(optKey.id, 'test');
     });
+
+    await t.test('8. UI Key Management Rendering: renderKeysList & renderHistoryList with active, lifetime, paused, and revoked keys', async () => {
+        const indexHtmlPath = path.join(__dirname, '..', 'public', 'index.html');
+        const content = fs.readFileSync(indexHtmlPath, 'utf8');
+        const scriptMatch = content.match(/<script(?:\s+type="[^"]*")?>([\s\S]*?)<\/script>/i);
+        assert.ok(scriptMatch, 'script tag must exist in index.html');
+
+        const vm = require('node:vm');
+        const domElements = {};
+        function getEl(id) {
+            if (!domElements[id]) {
+                domElements[id] = {
+                    id,
+                    style: {},
+                    classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+                    innerHTML: '',
+                    innerText: '',
+                    value: '',
+                    querySelectorAll: () => [],
+                    querySelector: () => null,
+                    addEventListener: () => {},
+                    focus: () => {}
+                };
+            }
+            return domElements[id];
+        }
+
+        const ctx = {
+            document: {
+                getElementById: (id) => getEl(id),
+                querySelector: (sel) => getEl(sel),
+                querySelectorAll: () => [],
+                body: { appendChild: () => {}, removeChild: () => {} }
+            },
+            window: {
+                location: { hash: '', href: '', reload: () => {} },
+                addEventListener: () => {},
+                matchMedia: () => ({ matches: false, addEventListener: () => {} }),
+                setInterval: () => {},
+                clearInterval: () => {},
+                setTimeout: () => {},
+                clearTimeout: () => {}
+            },
+            localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+            navigator: { clipboard: { writeText: () => Promise.resolve() } },
+            console: { log: () => {}, warn: () => {}, error: () => {} },
+            alert: () => {},
+            confirm: () => true,
+            fetch: () => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true, keys: [] }) })
+        };
+
+        vm.createContext(ctx);
+        vm.runInContext(scriptMatch[1], ctx);
+
+        // Inject varied sample keys including lifetime (-1) and standard duration
+        const sampleKeys = [
+            { id: 101, key_display: 'OPTIMIZER-AAAA-BBBB-CCCC-DDDD', status: 'ACTIVE', duration_hours: 24, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString(), active_devices_count: 1, max_devices: 1, customer_name: 'Test Customer' },
+            { id: 102, key_display: 'OPTIMIZER-EEEE-FFFF-GGGG-HHHH', status: 'INACTIVE', duration_hours: -1, created_at: new Date().toISOString(), expires_at: null, active_devices_count: 0, max_devices: 1, customer_name: 'Lifetime Customer' },
+            { id: 103, key_display: 'OPTIMIZER-IIII-JJJJ-KKKK-LLLL', status: 'PAUSED', duration_hours: 720, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString(), active_devices_count: 0, max_devices: 2 },
+            { id: 104, key_display: 'OPTIMIZER-MMMM-NNNN-OOOO-PPPP', status: 'REVOKED', duration_hours: 24, created_at: new Date().toISOString(), expires_at: null, active_devices_count: 0, max_devices: 1 }
+        ];
+
+        ctx.saveAllKeys(sampleKeys);
+
+        // Both render functions must execute without throwing (e.g. ReferenceError or TypeError)
+        assert.doesNotThrow(() => {
+            ctx.renderKeysList();
+        }, 'renderKeysList must not throw errors when rendering keys');
+
+        const keysContainer = getEl('keysListContainer');
+        assert.ok(keysContainer.innerHTML.includes('OPTIMIZER-AAAA-BBBB-CCCC-DDDD'), 'Total keys list must contain rendered key code');
+        assert.ok(keysContainer.innerHTML.includes('OPTIMIZER-EEEE-FFFF-GGGG-HHHH'), 'Total keys list must contain lifetime key');
+
+        assert.doesNotThrow(() => {
+            ctx.renderHistoryList();
+        }, 'renderHistoryList must not throw errors');
+
+        const historyContainer = getEl('historyListContainer');
+        assert.ok(historyContainer.innerHTML.includes('OPTIMIZER-AAAA-BBBB-CCCC-DDDD'), 'History list must contain rendered key code');
+    });
 });
