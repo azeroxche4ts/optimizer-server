@@ -1050,7 +1050,7 @@ async function getAllKeys({ search = '', status = '', limit = 1000 } = {}) {
         params.push(s, s, s, s);
     }
 
-    sql += ` ORDER BY COALESCE(k.created_at, '') DESC, k.id DESC LIMIT ?`;
+    sql += ` ORDER BY k.created_at DESC NULLS LAST, k.id DESC LIMIT ?`;
     params.push(limit);
 
     const res = await query(sql, params);

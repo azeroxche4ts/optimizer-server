@@ -581,4 +581,133 @@ test('Key Management & UI Test Suite', async (t) => {
         const historyContainer = getEl('historyListContainer');
         assert.ok(historyContainer.innerHTML.includes('OPTIMIZER-AAAA-BBBB-CCCC-DDDD'), 'History list must contain rendered key code');
     });
+
+    await t.test('9. Total Keys Panel: Newly generated key displays immediately and reliably in Total Keys panel', async () => {
+        const indexHtmlPath = path.join(__dirname, '..', 'public', 'index.html');
+        const content = fs.readFileSync(indexHtmlPath, 'utf8');
+        const scriptMatch = content.match(/<script(?:\s+type="[^"]*")?>([\s\S]*?)<\/script>/i);
+        assert.ok(scriptMatch, 'script tag must exist in index.html');
+
+        const vm = require('node:vm');
+        const domElements = {};
+        function getEl(id) {
+            if (!domElements[id]) {
+                domElements[id] = {
+                    id,
+                    style: {},
+                    classList: {
+                        classes: new Set(),
+                        add(c) { this.classes.add(c); },
+                        remove(c) { this.classes.delete(c); },
+                        toggle(c, force) {
+                            if (force === undefined) {
+                                if (this.classes.has(c)) this.classes.delete(c); else this.classes.add(c);
+                            } else if (force) this.classes.add(c); else this.classes.delete(c);
+                        },
+                        contains(c) { return this.classes.has(c); }
+                    },
+                    innerHTML: '',
+                    innerText: '',
+                    value: '',
+                    querySelectorAll: () => [],
+                    querySelector: () => null,
+                    addEventListener: () => {},
+                    focus: () => {}
+                };
+            }
+            return domElements[id];
+        }
+
+        const generatedKeyObj = {
+            id: 201,
+            key_display: 'OPTIMIZER-NEW1-GEN2-KEY3-TEST',
+            product_name: 'OPTIMIZER',
+            status: 'UNUSED',
+            duration_hours: 720,
+            created_at: new Date().toISOString(),
+            max_devices: 1
+        };
+
+        const ctx = {
+            document: {
+                getElementById: (id) => getEl(id),
+                querySelector: (sel) => getEl(sel),
+                querySelectorAll: () => [],
+                body: { appendChild: () => {}, removeChild: () => {} }
+            },
+            window: {
+                location: { hash: '', href: '', reload: () => {} },
+                addEventListener: () => {},
+                setInterval: () => 1,
+                clearInterval: () => {},
+                setTimeout: (fn) => fn(),
+                clearTimeout: () => {}
+            },
+            setInterval: () => 1,
+            clearInterval: () => {},
+            setTimeout: (fn) => fn(),
+            clearTimeout: () => {},
+            localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+            sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+            navigator: { clipboard: { writeText: () => Promise.resolve() } },
+            console: { log: () => {}, warn: () => {}, error: () => {} },
+            alert: () => {},
+            confirm: () => true,
+            fetch: (url) => {
+                if (url.includes('/api/keys/generate')) {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ success: true, key: generatedKeyObj, keys: [generatedKeyObj] })
+                    });
+                }
+                if (url.includes('/api/keys')) {
+                    return Promise.resolve({
+                        ok: true,
+                        json: () => Promise.resolve({ success: true, keys: [generatedKeyObj] })
+                    });
+                }
+                return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) });
+            }
+        };
+
+        vm.createContext(ctx);
+        vm.runInContext(scriptMatch[1], ctx);
+
+        // Generate key
+        await ctx.handleGenerateKey();
+
+        // Check latest key
+        const latestKeyText = getEl('latestKeyText').innerText;
+        assert.strictEqual(latestKeyText, 'OPTIMIZER-NEW1-GEN2-KEY3-TEST', 'Latest key text must match generated key');
+
+        // Switch to TOTAL_KEYS tab
+        ctx.switchTab('TOTAL_KEYS');
+        const keysContainer = getEl('keysListContainer');
+        assert.ok(
+            keysContainer.innerHTML.includes('OPTIMIZER-NEW1-GEN2-KEY3-TEST'),
+            'Total Keys container must render the newly generated key'
+        );
+        assert.ok(
+            !keysContainer.innerHTML.includes('No Keys Found'),
+            'Total Keys container must NOT display "No Keys Found" when key exists'
+        );
+
+        // Filter by ACTIVE (should show empty message with action button because new key is NON-ACTIVE)
+        ctx.setStatusFilter('ACTIVE');
+        assert.ok(
+            keysContainer.innerHTML.includes('No Keys Found'),
+            'Total Keys container shows No Keys Found under ACTIVE filter since key is UNUSED'
+        );
+        assert.ok(
+            keysContainer.innerHTML.includes('View All Keys'),
+            'Total Keys container provides a "View All Keys" action button'
+        );
+
+        // Reset to ALL
+        ctx.setStatusFilter('ALL');
+        assert.ok(
+            keysContainer.innerHTML.includes('OPTIMIZER-NEW1-GEN2-KEY3-TEST'),
+            'Switching to ALL shows the generated key again'
+        );
+    });
 });

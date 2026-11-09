@@ -1833,13 +1833,12 @@
             } else if (tab === 'TOTAL_KEYS') {
                 document.getElementById('tabBtnTotalKeys').classList.add('active');
                 document.getElementById('tabContentTotalKeys').style.display = 'block';
-                if (statusFilter !== null) {
-                    currentStatusFilter = (statusFilter === 'INACTIVE') ? 'NON-ACTIVE' : statusFilter;
-                    document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
-                        const s = c.getAttribute('data-status');
-                        c.classList.toggle('selected', s === currentStatusFilter || (currentStatusFilter === 'NON-ACTIVE' && s === 'INACTIVE'));
-                    });
-                }
+                const targetFilter = statusFilter !== null ? statusFilter : (currentStatusFilter || 'ALL');
+                currentStatusFilter = (targetFilter === 'INACTIVE') ? 'NON-ACTIVE' : targetFilter;
+                document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
+                    const s = c.getAttribute('data-status');
+                    c.classList.toggle('selected', s === currentStatusFilter || (currentStatusFilter === 'NON-ACTIVE' && s === 'INACTIVE'));
+                });
                 renderKeysList();
                 loadKeysData();
             } else if (tab === 'HISTORY') {
@@ -2061,6 +2060,13 @@
                         allKeys.unshift(latestKeyData);
                     }
                     saveAllKeys(allKeys);
+
+                    // Ensure Total Keys filter chip is set to ALL so newly generated keys are always immediately visible
+                    currentStatusFilter = 'ALL';
+                    document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
+                        c.classList.toggle('selected', c.getAttribute('data-status') === 'ALL');
+                    });
+
                     renderKeysList();
                     renderHistoryList();
                     updateStatsForCurrentDashboard();
@@ -2279,7 +2285,7 @@
         async function loadKeysData() {
             try {
                 const res = await api('/api/keys?limit=1000');
-                if (res.success && Array.isArray(res.keys)) {
+                if (res && res.success && Array.isArray(res.keys)) {
                     const serverKeys = res.keys;
                     const serverKeyMap = new Map();
                     for (const sk of serverKeys) {
@@ -2307,6 +2313,11 @@
                     renderKeysList();
                     renderHistoryList();
                     updateLiveCountdowns();
+                } else {
+                    console.warn('Background key refresh notice:', res?.message || 'Invalid keys response');
+                    renderKeysList();
+                    renderHistoryList();
+                    updateStatsForCurrentDashboard();
                 }
             } catch (err) {
                 console.warn('Background key refresh notice:', err.message);
@@ -2339,10 +2350,12 @@
         }
 
         // --- TOTAL KEYS TAB RENDERING ---
-        function setStatusFilter(status, btn) {
+        function setStatusFilter(status, btn = null) {
             currentStatusFilter = (status === 'INACTIVE') ? 'NON-ACTIVE' : status;
-            document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => c.classList.remove('selected'));
-            if (btn) btn.classList.add('selected');
+            document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
+                const s = c.getAttribute('data-status');
+                c.classList.toggle('selected', s === currentStatusFilter || (currentStatusFilter === 'NON-ACTIVE' && s === 'INACTIVE'));
+            });
             renderKeysList();
         }
 
@@ -2375,13 +2388,20 @@
             const filtered = filterKeys(allKeys);
 
             if (filtered.length === 0) {
+                const hasAny = allKeys.length > 0;
+                const activeFilterMsg = currentStatusFilter !== 'ALL' ? ` (Filter: ${currentStatusFilter})` : '';
                 container.innerHTML = `
                     <div style="text-align: center; padding: 48px 16px; color: var(--text-secondary);">
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 12px; opacity: 0.5;">
                             <circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3"></path>
                         </svg>
-                        <div style="font-weight: 700; font-size: 15px; color: var(--text-primary); margin-bottom: 4px;">No Keys Found</div>
-                        <p style="font-size: 13px;">No keys match the current filter criteria.</p>
+                        <div style="font-weight: 700; font-size: 15px; color: var(--text-primary); margin-bottom: 4px;">No Keys Found${activeFilterMsg}</div>
+                        <p style="font-size: 13px;">${hasAny ? 'No keys match the current filter criteria.' : 'No keys match the current filter criteria.'}</p>
+                        ${hasAny && currentStatusFilter !== 'ALL' ? `
+                            <button class="btn btn-tonal btn-sm" onclick="setStatusFilter('ALL')" style="margin-top: 12px;">
+                                View All Keys (${allKeys.length})
+                            </button>
+                        ` : ''}
                     </div>
                 `;
                 return;

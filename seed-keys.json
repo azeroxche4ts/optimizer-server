@@ -1,3 +1,191 @@
 [
- 
+  {
+    "key": "AZEROX-5HAQ-MB8E-VCGH-WVMC",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "AZEROX",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": [
+      {
+        "device_identifier": "a4d730c3f070a8df87aceba36db6dff91f8462cce8346da70272d32a0fd5ecd3",
+        "device_model": "Xiaomi 2412DPC0AI",
+        "platform": "Android",
+        "activated_at": "2026-10-20 05:15:49",
+        "expires_at": "2026-10-21T05:16:41.348Z",
+        "status": "ACTIVE",
+        "session_token": "31c6ce2f6e1aea6205e8cf18edf52a591755e92d256e012be03ea1d750d869c3",
+        "last_seen_at": "2026-10-20 05:15:49"
+      }
+    ]
+  },
+  {
+    "key": "AZEROX-B2K5-UV4X-YTRN-F8M8",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "TRIAL",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-JFFL-JCHQ-D3AX-4MLC",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "MUKESH",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-53D5-EFGY-6ST5-RMB6",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "KAVISH",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-PSVB-9C3H-FY6W-KEXZ",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "DHARSHAN",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-4W2B-M4KF-T9QS-KEV2",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 24,
+    "created_at": "2026-10-20 04:48:49",
+    "activated_at": "2026-10-20 04:48:49",
+    "expires_at": "2026-10-21T05:16:41.348Z",
+    "max_devices": 5,
+    "customer_name": "SRINIVASAN",
+    "notes": "v1.4.3 Active Key - 1 Day",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-DDSW-3LDC-R9C3-N4YQ",
+    "product": "OPTIMIZE",
+    "status": "EXPIRED",
+    "duration_hours": 168,
+    "created_at": "2026-10-23 11:39:57",
+    "activated_at": "2026-10-23 11:39:57",
+    "expires_at": "2026-10-30T11:39:57.610Z",
+    "max_devices": 1,
+    "customer_name": "AZEROX",
+    "notes": "v1.4.5 Active Key - 7 Days",
+    "activations": [
+      {
+        "device_identifier": "6b35b758d373144ec2724d5661fe79a47a2a2643d39a14a444caf09ec6fdef15",
+        "device_model": "Xiaomi 2412DPC0AI",
+        "platform": "Android",
+        "activated_at": "2026-10-23 11:39:57",
+        "expires_at": "2026-10-30T11:39:57.610Z",
+        "status": "ACTIVE",
+        "session_token": "9028df8cb93acae5469500da03c0be1c88b21dc3706bc3a6e831cf538f649801",
+        "last_seen_at": "2026-10-24 19:45:00"
+      }
+    ]
+  },
+  {
+    "key": "AZEROX-FN46-V9K7-K7LH-XXF5",
+    "product": "OPTIMIZE",
+    "status": "ACTIVE",
+    "duration_hours": 720,
+    "created_at": "2026-10-24 14:45:00",
+    "activated_at": "2026-10-24T14:45:09.780Z",
+    "expires_at": "2026-11-23T14:45:09.780Z",
+    "max_devices": 1,
+    "customer_name": "AZEROX",
+    "notes": "v1.4.5 Active Key - 30 Days",
+    "activations": [
+      {
+        "device_identifier": "a4d730c3f070a8df87aceba36db6dff91f8462cce8346da70272d32a0fd5ecd3",
+        "device_model": "Xiaomi 2412DPC0AI",
+        "platform": "Android",
+        "activated_at": "2026-10-24T14:45:09.780Z",
+        "expires_at": "2026-11-23T14:45:09.780Z",
+        "status": "ACTIVE",
+        "session_token": "c67d6bec594dfa62a61478eae4833a046d7ae2cab416bcc8dfdb88167b5f20dd",
+        "last_seen_at": "2026-10-24 20:15:54"
+      }
+    ]
+  },
+  {
+    "key": "AZEROX-PVF7-CYYE-TRU7-AT9G",
+    "product": "OPTIMIZE",
+    "status": "UNUSED",
+    "duration_hours": 24,
+    "created_at": "2026-11-02 03:27:37",
+    "activated_at": null,
+    "expires_at": null,
+    "max_devices": 1,
+    "customer_name": null,
+    "notes": "CLI test optimize",
+    "activations": []
+  },
+  {
+    "key": "AZEROX-VIP-4Q2T-A4AN-3QD2-W7VA",
+    "product": "OPTIMIZE",
+    "status": "UNUSED",
+    "duration_hours": 168,
+    "created_at": "2026-11-02 03:27:47",
+    "activated_at": null,
+    "expires_at": null,
+    "max_devices": 1,
+    "customer_name": null,
+    "notes": "CLI test vip",
+    "activations": []
+  },
+  {
+    "key": "OPTIMIZER-FLUV-T65N-92LV-4HFQ",
+    "product": "OPTIMIZER",
+    "status": "UNUSED",
+    "duration_hours": 24,
+    "created_at": "2026-11-02 04:02:37",
+    "activated_at": null,
+    "expires_at": null,
+    "max_devices": 1,
+    "customer_name": null,
+    "notes": "Verification Key",
+    "activations": []
+  },
+  {
+    "key": "OPTIMIZER-4NRV-M47X-PW7X-TSG4",
+    "product": "OPTIMIZER",
+    "status": "UNUSED",
+    "duration_hours": 720,
+    "created_at": "2026-11-09T15:31:24.941Z",
+    "activated_at": null,
+    "expires_at": null,
+    "max_devices": 1,
+    "customer_name": "Test Customer",
+    "notes": "test",
+    "activations": []
+  }
 ]
