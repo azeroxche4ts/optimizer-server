@@ -646,7 +646,7 @@ async function handleListKeys(req, res) {
     try {
         const search = req.query.search || '';
         const status = req.query.status || 'ALL';
-        const limit = parseInt(req.query.limit, 10) || 150;
+        const limit = parseInt(req.query.limit, 10) || 1000;
 
         const keys = await db.getAllKeys({ search, status, limit });
         res.json({ success: true, keys });
@@ -1250,10 +1250,24 @@ async function handleCustomerActivate(req, res) {
             const token = existingActivation.session_token || generateToken();
             await db.updateActivationLastSeen(existingActivation.id, token);
             await db.query("UPDATE activations SET status = 'ACTIVE', is_active = 1 WHERE id = ?", [existingActivation.id]);
-            if (keyRecord.status === 'UNUSED') {
+            if (keyRecord.status === 'UNUSED' || keyRecord.status !== 'ACTIVE') {
                 await db.updateKeyStatus(keyRecord.id, 'ACTIVE');
                 keyRecord.status = 'ACTIVE';
             }
+            if (!keyRecord.activated_at) {
+                const actTimeIso = new Date().toISOString();
+                await db.query("UPDATE activation_keys SET activated_at = ? WHERE id = ?", [actTimeIso, keyRecord.id]);
+                keyRecord.activated_at = actTimeIso;
+            }
+            if (typeof db.checkpointSqlite === 'function') db.checkpointSqlite('PASSIVE');
+            await db.exportSeedKeys();
+            broadcastAdminEvent('KEY_ACTIVATED', {
+                key: keyRecord.key_display || formattedKey,
+                key_id: keyRecord.id,
+                status: 'ACTIVE',
+                device_id: deviceId,
+                model: deviceModel
+            });
 
             let effectiveExpiresAt = keyRecord.expires_at || existingActivation.expires_at;
             let remainingSeconds = 0;
@@ -1340,6 +1354,17 @@ async function handleCustomerActivate(req, res) {
             SET status = 'ACTIVE', activated_at = COALESCE(activated_at, ?), expires_at = ?
             WHERE id = ?
         `, [activatedAtIso, finalExpiresAt, keyRecord.id]);
+
+        if (typeof db.checkpointSqlite === 'function') db.checkpointSqlite('PASSIVE');
+        await db.exportSeedKeys();
+
+        broadcastAdminEvent('KEY_ACTIVATED', {
+            key: formattedKey,
+            key_id: keyRecord.id,
+            status: 'ACTIVE',
+            device_id: deviceId,
+            model: deviceModel
+        });
 
         await db.logAuditEvent('DEVICE_ACTIVATED', { key: formattedKey, device_id: deviceId, model: deviceModel }, ip);
 

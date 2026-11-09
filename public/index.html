@@ -848,7 +848,7 @@
                     </svg>
                     Generator
                 </button>
-                <button class="tab-button" id="tabBtnTotalKeys" onclick="switchTab('TOTAL_KEYS')">
+                <button class="tab-button" id="tabBtnTotalKeys" onclick="switchTab('TOTAL_KEYS', 'ALL')">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
                         <line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
@@ -1524,7 +1524,7 @@
 
                 adminEventSource.onopen = () => {
                     console.log('[SSE] Connected to real-time events stream');
-                    startPolling(30000); // SSE is active; maintain low-frequency 30s background sync
+                    startPolling(10000); // SSE is active; maintain 10s background sync
                 };
 
                 adminEventSource.onmessage = (e) => {
@@ -1567,9 +1567,12 @@
 
         function handleRealtimeAdminEvent(event) {
             if (!event || !event.type) return;
-            // Always refresh stats and keys across connected dashboards without page reloads
+            console.log('[SSE] Live Event Received:', event.type, event.payload);
             loadStatsData();
             loadKeysData();
+            if (event.type === 'KEY_ACTIVATED') {
+                showToast(`Key ${event.payload?.key || ''} activated successfully!`);
+            }
         }
 
         function getToken() {
@@ -1818,7 +1821,7 @@
         }
 
         // --- NAVIGATION TABS ---
-        function switchTab(tab) {
+        function switchTab(tab, statusFilter = null) {
             document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
             document.getElementById('tabContentGenerator').style.display = 'none';
             document.getElementById('tabContentTotalKeys').style.display = 'none';
@@ -1830,11 +1833,20 @@
             } else if (tab === 'TOTAL_KEYS') {
                 document.getElementById('tabBtnTotalKeys').classList.add('active');
                 document.getElementById('tabContentTotalKeys').style.display = 'block';
+                if (statusFilter !== null) {
+                    currentStatusFilter = (statusFilter === 'INACTIVE') ? 'NON-ACTIVE' : statusFilter;
+                    document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
+                        const s = c.getAttribute('data-status');
+                        c.classList.toggle('selected', s === currentStatusFilter || (currentStatusFilter === 'NON-ACTIVE' && s === 'INACTIVE'));
+                    });
+                }
                 renderKeysList();
+                loadKeysData();
             } else if (tab === 'HISTORY') {
                 document.getElementById('tabBtnHistory').classList.add('active');
                 document.getElementById('tabContentHistory').style.display = 'block';
                 renderHistoryList();
+                loadKeysData();
             }
         }
 
@@ -1845,7 +1857,8 @@
                 const s = c.getAttribute('data-status');
                 c.classList.toggle('selected', s === target || (target === 'NON-ACTIVE' && s === 'INACTIVE'));
             });
-            switchTab('TOTAL_KEYS');
+            switchTab('TOTAL_KEYS', target);
+            loadKeysData();
         }
 
         // --- DASHBOARD INITIALIZATION (OPTIMIZER) ---
@@ -2164,8 +2177,11 @@
             if (s === 'EXPIRED') return 'EXPIRED';
             if (k.expires_at && new Date(k.expires_at).getTime() <= Date.now()) return 'EXPIRED';
             if (s === 'ACTIVE') return 'ACTIVE';
-            if (s === 'UNUSED' || s === 'INACTIVE' || s === 'NON-ACTIVE' || s === 'NON_ACTIVE' || !k.activated_at) return 'NON-ACTIVE';
-            return 'ACTIVE';
+            if (k.active_devices_count > 0 || (Array.isArray(k.activations) && k.activations.length > 0) || k.activated_at) {
+                return 'ACTIVE';
+            }
+            if (s === 'UNUSED' || s === 'INACTIVE' || s === 'NON-ACTIVE' || s === 'NON_ACTIVE') return 'NON-ACTIVE';
+            return 'NON-ACTIVE';
         }
 
         function formatStatusBadge(status) {
@@ -2262,22 +2278,29 @@
 
         async function loadKeysData() {
             try {
-                const res = await api('/api/keys?limit=250');
+                const res = await api('/api/keys?limit=1000');
                 if (res.success && Array.isArray(res.keys)) {
                     const serverKeys = res.keys;
-                    // Preserve any newly created key details from local cache
+                    const serverKeyMap = new Map();
+                    for (const sk of serverKeys) {
+                        if (sk.id) serverKeyMap.set(String(sk.id), sk);
+                        if (sk.key_display) serverKeyMap.set(String(sk.key_display), sk);
+                    }
+                    const localOnly = allKeys.filter(k => !serverKeyMap.has(String(k.id)) && !serverKeyMap.has(String(k.key_display)));
+                    allKeys = [...localOnly, ...serverKeys];
+                    saveAllKeys(allKeys);
+
+                    // Preserve and synchronize latest key details from server updates (e.g. activation)
                     if (latestKeyData) {
                         const inServer = serverKeys.find(k => String(k.id) === String(latestKeyData.id) || k.key_display === latestKeyData.key_display);
                         if (inServer) {
                             latestKeyData = { ...latestKeyData, ...inServer };
+                            saveLatestKey(latestKeyData);
                         }
-                    }
-                    allKeys = serverKeys;
-                    saveAllKeys(allKeys);
-                    if (!latestKeyData && allKeys.length > 0) {
+                    } else if (allKeys.length > 0) {
                         latestKeyData = allKeys[0];
+                        saveLatestKey(latestKeyData);
                     }
-                    saveLatestKey(latestKeyData);
 
                     updateStatsForCurrentDashboard();
                     syncLatestKeyForCurrentDashboard();

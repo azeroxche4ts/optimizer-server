@@ -963,11 +963,12 @@ async function createActivationKey(params = {}) {
     const resolvedMaxDevices = maxDevices !== undefined ? maxDevices : (max_devices !== undefined ? max_devices : 1);
     const resolvedCustomer = customerName || customer_name || null;
 
+    const createdAtIso = new Date().toISOString();
     await query(`
         INSERT INTO activation_keys (
             key_hash, key_last4, key_display, product_id, status, 
-            duration_hours, max_devices, customer_name, notes
-        ) VALUES (?, ?, ?, ?, 'UNUSED', ?, ?, ?, ?)
+            duration_hours, max_devices, customer_name, notes, created_at
+        ) VALUES (?, ?, ?, ?, 'UNUSED', ?, ?, ?, ?, ?)
     `, [
         keyHash,
         keyLast4,
@@ -976,7 +977,8 @@ async function createActivationKey(params = {}) {
         resolvedDuration,
         resolvedMaxDevices,
         resolvedCustomer,
-        notes || ''
+        notes || '',
+        createdAtIso
     ]);
 
     checkpointSqlite('PASSIVE');
@@ -1003,7 +1005,7 @@ async function getKeyById(id) {
     `, [id]);
 }
 
-async function getAllKeys({ search = '', status = '', limit = 100 } = {}) {
+async function getAllKeys({ search = '', status = '', limit = 1000 } = {}) {
     // Self-heal: ensure keys with active devices or activated_at are marked ACTIVE
     try {
         await query(`
@@ -1048,7 +1050,7 @@ async function getAllKeys({ search = '', status = '', limit = 100 } = {}) {
         params.push(s, s, s, s);
     }
 
-    sql += ` ORDER BY k.created_at DESC LIMIT ?`;
+    sql += ` ORDER BY COALESCE(k.created_at, '') DESC, k.id DESC LIMIT ?`;
     params.push(limit);
 
     const res = await query(sql, params);
