@@ -447,6 +447,33 @@ app.post('/api/keys/import', requireAdmin, async (req, res) => {
     }
 });
 
+// Safe helper for HTTP JSON fetching that gracefully handles non-JSON / HTML error pages
+async function safeFetchJson(url, options = {}) {
+    try {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        try {
+            const data = JSON.parse(text);
+            return { ok: res.ok, status: res.status, data };
+        } catch {
+            return {
+                ok: false,
+                status: res.status,
+                data: {
+                    success: false,
+                    message: `Remote server returned HTTP ${res.status} (${res.statusText || 'Non-JSON response'})`
+                }
+            };
+        }
+    } catch (err) {
+        return {
+            ok: false,
+            status: 0,
+            data: { success: false, message: `Network request failed: ${err.message}` }
+        };
+    }
+}
+
 // Helper: Forward key deletion to Cloud Server immediately (development only)
 async function deleteKeyFromCloud(keyIdentifier) {
     if (config.isRender || !config.autoSyncCloud) return;
@@ -455,32 +482,29 @@ async function deleteKeyFromCloud(keyIdentifier) {
         const adminUser = config.adminUsername;
         const adminPass = config.adminPassword;
         
-        const loginRes = await fetch(`${cloudUrl}/api/auth/admin/login`, {
+        const login = await safeFetchJson(`${cloudUrl}/api/auth/admin/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: adminUser, password: adminPass })
         });
-        const loginData = await loginRes.json();
-        if (!loginData.success || !loginData.token) return;
+        if (!login.ok || !login.data.success || !login.data.token) return;
 
         let targetId = keyIdentifier;
-        if (typeof keyIdentifier === 'string' && (keyIdentifier.startsWith('AZEROX') || keyIdentifier.startsWith('MADARA-FF'))) {
-            const listRes = await fetch(`${cloudUrl}/api/keys?search=${encodeURIComponent(keyIdentifier)}`, {
-                headers: { 'Authorization': `Bearer ${loginData.token}` }
+        if (typeof keyIdentifier === 'string' && (keyIdentifier.includes('-') || isNaN(Number(keyIdentifier)))) {
+            const list = await safeFetchJson(`${cloudUrl}/api/keys?search=${encodeURIComponent(keyIdentifier)}`, {
+                headers: { 'Authorization': `Bearer ${login.data.token}` }
             });
-            const listData = await listRes.json();
-            if (listData.keys && listData.keys.length > 0) {
-                const found = listData.keys.find(k => k.key_display === keyIdentifier);
+            if (list.ok && list.data.keys && list.data.keys.length > 0) {
+                const found = list.data.keys.find(k => k.key_display === keyIdentifier);
                 if (found) targetId = found.id;
             }
         }
 
-        const delRes = await fetch(`${cloudUrl}/api/keys/${targetId}`, {
+        const del = await safeFetchJson(`${cloudUrl}/api/keys/${targetId}`, {
             method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${loginData.token}` }
+            headers: { 'Authorization': `Bearer ${login.data.token}` }
         });
-        const delData = await delRes.json();
-        console.log(`[SYNC] Forwarded deletion of key ${keyIdentifier} to cloud:`, delData.message || delRes.status);
+        console.log(`[SYNC] Forwarded deletion of key ${keyIdentifier} to cloud:`, del.data?.message || del.status);
     } catch (e) {
         console.warn(`[SYNC] Failed to forward deletion of ${keyIdentifier} to cloud:`, e.message);
     }
@@ -494,36 +518,33 @@ async function updateKeyOnCloud(keyIdentifier, updatePayload) {
         const adminUser = config.adminUsername;
         const adminPass = config.adminPassword;
         
-        const loginRes = await fetch(`${cloudUrl}/api/auth/admin/login`, {
+        const login = await safeFetchJson(`${cloudUrl}/api/auth/admin/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: adminUser, password: adminPass })
         });
-        const loginData = await loginRes.json();
-        if (!loginData.success || !loginData.token) return;
+        if (!login.ok || !login.data.success || !login.data.token) return;
 
         let targetId = keyIdentifier;
-        if (typeof keyIdentifier === 'string' && (keyIdentifier.startsWith('AZEROX') || keyIdentifier.startsWith('MADARA-FF'))) {
-            const listRes = await fetch(`${cloudUrl}/api/keys?search=${encodeURIComponent(keyIdentifier)}`, {
-                headers: { 'Authorization': `Bearer ${loginData.token}` }
+        if (typeof keyIdentifier === 'string' && (keyIdentifier.includes('-') || isNaN(Number(keyIdentifier)))) {
+            const list = await safeFetchJson(`${cloudUrl}/api/keys?search=${encodeURIComponent(keyIdentifier)}`, {
+                headers: { 'Authorization': `Bearer ${login.data.token}` }
             });
-            const listData = await listRes.json();
-            if (listData.keys && listData.keys.length > 0) {
-                const found = listData.keys.find(k => k.key_display === keyIdentifier);
+            if (list.ok && list.data.keys && list.data.keys.length > 0) {
+                const found = list.data.keys.find(k => k.key_display === keyIdentifier);
                 if (found) targetId = found.id;
             }
         }
 
-        const patchRes = await fetch(`${cloudUrl}/api/keys/${targetId}`, {
+        const patch = await safeFetchJson(`${cloudUrl}/api/keys/${targetId}`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `Bearer ${loginData.token}`,
+                'Authorization': `Bearer ${login.data.token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(updatePayload)
         });
-        const patchData = await patchRes.json();
-        console.log(`[SYNC] Forwarded update of key ${keyIdentifier} to cloud:`, patchData.message || patchRes.status);
+        console.log(`[SYNC] Forwarded update of key ${keyIdentifier} to cloud:`, patch.data?.message || patch.status);
     } catch (e) {
         console.warn(`[SYNC] Failed to forward update of ${keyIdentifier} to cloud:`, e.message);
     }
@@ -539,23 +560,21 @@ async function syncWithCloudServer() {
     const adminPass = config.adminPassword;
 
     // Step 1: Login to Cloud Server
-    const loginRes = await fetch(`${cloudUrl}/api/auth/admin/login`, {
+    const login = await safeFetchJson(`${cloudUrl}/api/auth/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: adminUser, password: adminPass })
     });
-    const loginData = await loginRes.json();
-    if (!loginData.success || !loginData.token) {
-        throw new Error(loginData.message || 'Cloud authentication failed');
+    if (!login.ok || !login.data.success || !login.data.token) {
+        throw new Error(login.data?.message || `Cloud authentication failed with status ${login.status}`);
     }
 
-    const cloudToken = loginData.token;
+    const cloudToken = login.data.token;
 
     // Step 2: Fetch remote keys from Cloud Server
-    const cloudKeysRes = await fetch(`${cloudUrl}/api/keys?limit=250`, {
+    const cloudKeys = await safeFetchJson(`${cloudUrl}/api/keys?limit=250`, {
         headers: { 'Authorization': `Bearer ${cloudToken}` }
     });
-    const cloudKeysData = await cloudKeysRes.json();
     let importedLocally = 0;
     let purgedFromCloud = 0;
 
@@ -565,27 +584,24 @@ async function syncWithCloudServer() {
     const localDeletedHashes = new Set(localDeleted.map(d => d.key_hash));
     const localDeletedDisplays = new Set(localDeleted.filter(d => d.key_display).map(d => d.key_display.trim().toUpperCase()));
 
-    if (cloudKeysData.success && Array.isArray(cloudKeysData.keys)) {
+    if (cloudKeys.ok && cloudKeys.data.success && Array.isArray(cloudKeys.data.keys)) {
         const remainingCloudKeys = [];
-        for (const ck of cloudKeysData.keys) {
+        for (const ck of cloudKeys.data.keys) {
             // Keep active and valid keys intact; do not issue destructive automated DELETE requests
             remainingCloudKeys.push(ck);
         }
 
         // Try to fetch remote deleted keys from Cloud Server (if endpoint exists)
         try {
-            const remoteDeletedRes = await fetch(`${cloudUrl}/api/admin/deleted-keys`, {
+            const remoteDeleted = await safeFetchJson(`${cloudUrl}/api/admin/deleted-keys`, {
                 headers: { 'Authorization': `Bearer ${cloudToken}` }
             });
-            if (remoteDeletedRes.ok) {
-                const remoteDeletedData = await remoteDeletedRes.json();
-                if (remoteDeletedData.success && Array.isArray(remoteDeletedData.deletedKeys)) {
-                    for (const rk of remoteDeletedData.deletedKeys) {
-                        const rkHash = rk.key_hash;
-                        const rkDisplay = rk.key_display;
-                        if (!(await db.isKeyDeleted(rkHash))) {
-                            await db.deleteKey(rkDisplay || rkHash, 'cloud-sync', 'Synced deletion from cloud');
-                        }
+            if (remoteDeleted.ok && remoteDeleted.data.success && Array.isArray(remoteDeleted.data.deletedKeys)) {
+                for (const rk of remoteDeleted.data.deletedKeys) {
+                    const rkHash = rk.key_hash;
+                    const rkDisplay = rk.key_display;
+                    if (!(await db.isKeyDeleted(rkHash))) {
+                        await db.deleteKey(rkDisplay || rkHash, 'cloud-sync', 'Synced deletion from cloud');
                     }
                 }
             }
@@ -601,7 +617,7 @@ async function syncWithCloudServer() {
 
     // Step 4: Export local valid keys and sync to Cloud Server
     const localSeedKeys = await db.exportSeedKeys();
-    const pushRes = await fetch(`${cloudUrl}/api/keys/import`, {
+    const push = await safeFetchJson(`${cloudUrl}/api/keys/import`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -609,7 +625,6 @@ async function syncWithCloudServer() {
         },
         body: JSON.stringify({ keys: localSeedKeys })
     });
-    const pushData = await pushRes.json();
 
     return {
         success: true,
@@ -617,7 +632,7 @@ async function syncWithCloudServer() {
         cloudUrl,
         importedLocally,
         purgedFromCloud,
-        pushedToCloud: pushData.count || localSeedKeys.length
+        pushedToCloud: push.data?.count || localSeedKeys.length
     };
 }
 
@@ -1000,16 +1015,15 @@ async function handleClearAllKeys(req, res) {
                 const cloudUrl = config.cloudServerUrl;
                 const adminUser = config.adminUsername;
                 const adminPass = config.adminPassword;
-                const loginRes = await fetch(`${cloudUrl}/api/auth/admin/login`, {
+                const login = await safeFetchJson(`${cloudUrl}/api/auth/admin/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: adminUser, password: adminPass })
                 });
-                const loginData = await loginRes.json();
-                if (loginData.token) {
-                    await fetch(`${cloudUrl}/api/keys/clear-all`, {
+                if (login.ok && login.data.token) {
+                    await safeFetchJson(`${cloudUrl}/api/keys/clear-all`, {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${loginData.token}` }
+                        headers: { 'Authorization': `Bearer ${login.data.token}` }
                     });
                     console.log('[SYNC] Purged all keys and sessions on Render Cloud as well');
                 }
@@ -1037,16 +1051,15 @@ async function handleClearActiveKeys(req, res) {
                 const cloudUrl = config.cloudServerUrl;
                 const adminUser = config.adminUsername;
                 const adminPass = config.adminPassword;
-                const loginRes = await fetch(`${cloudUrl}/api/auth/admin/login`, {
+                const login = await safeFetchJson(`${cloudUrl}/api/auth/admin/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: adminUser, password: adminPass })
                 });
-                const loginData = await loginRes.json();
-                if (loginData.token) {
-                    await fetch(`${cloudUrl}/api/keys/clear-active`, {
+                if (login.ok && login.data.token) {
+                    await safeFetchJson(`${cloudUrl}/api/keys/clear-active`, {
                         method: 'POST',
-                        headers: { 'Authorization': `Bearer ${loginData.token}` }
+                        headers: { 'Authorization': `Bearer ${login.data.token}` }
                     });
                     console.log('[SYNC] Purged active keys on Render Cloud as well');
                 }

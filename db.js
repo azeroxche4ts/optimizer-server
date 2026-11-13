@@ -1176,10 +1176,7 @@ async function updateKeyDetails(id, { notes, customerName, maxDevices, status, k
         ? (activatedAt ? new Date(activatedAt).toISOString() : null)
         : currentKey.activated_at;
 
-    if (activatedAt !== undefined) {
-        fields.push('activated_at = ?');
-        params.push(targetActivatedAt);
-    }
+    let shouldUpdateActivatedAt = activatedAt !== undefined;
 
     // Determine target expires_at: PRESERVE existing expiration time unless explicitly modified
     let targetExpiresAt = undefined;
@@ -1195,7 +1192,7 @@ async function updateKeyDetails(id, { notes, customerName, maxDevices, status, k
         shouldUpdateExpiryField = true;
         targetActivatedAt = null;
         targetExpiresAt = null;
-        fields.push('activated_at = NULL');
+        shouldUpdateActivatedAt = true;
     } else if (durationHours !== undefined && durationHours !== currentKey.duration_hours && !currentKey.expires_at) {
         // Only calculate expires_at from duration if key does not already have an active expiration timestamp
         shouldUpdateExpiryField = true;
@@ -1212,6 +1209,11 @@ async function updateKeyDetails(id, { notes, customerName, maxDevices, status, k
     } else {
         // Retain original expiration timestamp unchanged
         targetExpiresAt = currentKey.expires_at;
+    }
+
+    if (shouldUpdateActivatedAt) {
+        fields.push('activated_at = ?');
+        params.push(targetActivatedAt);
     }
 
     if (shouldUpdateExpiryField) {
@@ -1668,12 +1670,22 @@ async function getOrCreateDevice(customerId, deviceId, deviceModel = null, appId
 // Activations
 // -------------------------------------------------------------
 async function findActivation(keyId, deviceId) {
-    return await queryOne(`
-        SELECT a.*, d.device_identifier, d.device_model
-        FROM activations a
-        JOIN devices d ON a.device_id = d.id
-        WHERE (a.key_id = ? OR a.license_id = ?) AND a.device_id = ?
-    `, [keyId, keyId, deviceId]);
+    const isNum = typeof deviceId === 'number' || (/^\d+$/.test(String(deviceId)) && Number(deviceId) < 2147483647);
+    if (isNum) {
+        return await queryOne(`
+            SELECT a.*, d.device_identifier, d.device_model
+            FROM activations a
+            JOIN devices d ON a.device_id = d.id
+            WHERE (a.key_id = ? OR a.license_id = ?) AND (a.device_id = ? OR d.device_identifier = ?)
+        `, [keyId, keyId, Number(deviceId), String(deviceId)]);
+    } else {
+        return await queryOne(`
+            SELECT a.*, d.device_identifier, d.device_model
+            FROM activations a
+            JOIN devices d ON a.device_id = d.id
+            WHERE (a.key_id = ? OR a.license_id = ?) AND d.device_identifier = ?
+        `, [keyId, keyId, String(deviceId)]);
+    }
 }
 
 async function getActiveActivationsCount(keyId) {
@@ -1725,11 +1737,14 @@ async function updateActivationLastSeen(activationId, sessionToken = null) {
 }
 
 async function deactivateDevice(keyId, deviceId) {
-    const res = await query(`
-        UPDATE activations 
-        SET status = 'INACTIVE', is_active = 0 
-        WHERE (key_id = ? OR license_id = ?) AND device_id = ?
-    `, [keyId, keyId, deviceId]);
+    const isNum = typeof deviceId === 'number' || (/^\d+$/.test(String(deviceId)) && Number(deviceId) < 2147483647);
+    const sql = isNum
+        ? `UPDATE activations SET status = 'INACTIVE', is_active = 0 WHERE (key_id = ? OR license_id = ?) AND (device_id = ? OR device_id IN (SELECT id FROM devices WHERE device_identifier = ?))`
+        : `UPDATE activations SET status = 'INACTIVE', is_active = 0 WHERE (key_id = ? OR license_id = ?) AND device_id IN (SELECT id FROM devices WHERE device_identifier = ?)`;
+    const params = isNum
+        ? [keyId, keyId, Number(deviceId), String(deviceId)]
+        : [keyId, keyId, String(deviceId)];
+    const res = await query(sql, params);
     exportSeedKeys().catch(e => console.warn('[SEED] Async export warning:', e.message));
     return res;
 }

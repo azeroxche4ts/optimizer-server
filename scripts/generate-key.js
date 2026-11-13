@@ -82,7 +82,10 @@ async function main() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username: adminUser, password: adminPass })
                 });
-                const loginData = await loginRes.json();
+                const loginText = await loginRes.text();
+                let loginData;
+                try { loginData = JSON.parse(loginText); } catch { loginData = { success: false, message: `HTTP ${loginRes.status}` }; }
+
                 if (loginData.success && loginData.token) {
                     await fetch(`${cloudUrl}/api/keys/import`, {
                         method: 'POST',
