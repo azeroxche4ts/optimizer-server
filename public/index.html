@@ -941,12 +941,43 @@
                 <!-- 2. Product & Duration Selector Card -->
                 <div class="card">
                     <!-- Product Header Row -->
-                    <div class="section-header-row" style="margin-bottom: 14px;">
+                    <div class="section-header-row" style="margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                         <h2 class="section-title" id="generatorCardTitle">⚡ OPTIMIZER Key Generator</h2>
-                        <span class="section-subtitle-value" id="selectedProductLabel" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; padding: 4px 10px; border-radius: 6px; font-weight: 700;">OPTIMIZER</span>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-tonal btn-sm" onclick="openBulkGeneratorModal()" title="Open Dedicated Bulk Generator Tool" style="font-size: 12px; font-weight: 700; background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); display: flex; align-items: center; gap: 4px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3"></path></svg>
+                                Bulk Generator
+                            </button>
+                            <span class="section-subtitle-value" id="selectedProductLabel" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; padding: 4px 10px; border-radius: 6px; font-weight: 700;">OPTIMIZER</span>
+                        </div>
                     </div>
 
+                    <!-- Generation Quantity / Bulk Option -->
                     <div class="section-header-row">
+                        <h2 class="section-title">Generation Quantity</h2>
+                        <span class="section-subtitle-value" id="selectedQuantityLabel" style="color: #818cf8; font-weight: 700;">Single (1 Key)</span>
+                    </div>
+
+                    <div class="duration-chips-scroll" id="quantityChipsRow">
+                        <button class="chip selected" data-qty="1" onclick="selectQuantity(1, this)">1 Key (Single)</button>
+                        <button class="chip" data-qty="5" onclick="selectQuantity(5, this)">5 Keys</button>
+                        <button class="chip" data-qty="10" onclick="selectQuantity(10, this)">10 Keys</button>
+                        <button class="chip" data-qty="25" onclick="selectQuantity(25, this)">25 Keys</button>
+                        <button class="chip" data-qty="50" onclick="selectQuantity(50, this)">50 Keys</button>
+                        <button class="chip" data-qty="100" onclick="selectQuantity(100, this)">100 Keys</button>
+                        <button class="chip" id="chipCustomQty" onclick="toggleCustomQtyInput()">Custom Qty</button>
+                    </div>
+
+                    <div id="customQtyInputContainer" style="display: none; margin-top: 8px; margin-bottom: 8px; background: var(--bg-surface-variant); padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <label class="form-label" style="margin: 0; font-size: 12px; white-space: nowrap;">Custom Quantity (1-100):</label>
+                            <input type="number" id="inputCustomQty" class="form-input" min="1" max="100" value="15" placeholder="1-100" style="max-width: 110px; padding: 6px 10px; font-size: 13px;">
+                            <button class="btn btn-primary btn-sm" onclick="applyCustomQuantity()">Set Quantity</button>
+                            <button class="btn btn-outline btn-sm" onclick="toggleCustomQtyInput(false)">Cancel</button>
+                        </div>
+                    </div>
+
+                    <div class="section-header-row" style="margin-top: 14px;">
                         <h2 class="section-title">Key Validity Duration</h2>
                         <span class="section-subtitle-value" id="selectedDurationLabel">30 Days</span>
                     </div>
@@ -1059,6 +1090,11 @@
                             </svg>
                             <input type="text" id="searchKeysInput" class="search-input" placeholder="Search key, customer, notes..." oninput="handleSearch()">
                         </div>
+
+                        <button class="btn btn-tonal btn-sm" onclick="openBulkGeneratorModal()" title="Bulk Key Generator" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35); display: flex; align-items: center; gap: 4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3"></path></svg>
+                            Bulk Generate
+                        </button>
 
                         <button class="btn btn-outline btn-sm" onclick="downloadKeysBackup()" title="Download Persistent JSON Backup" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1439,6 +1475,147 @@
         </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- MODAL: BULK KEY GENERATOR                  -->
+    <!-- ========================================== -->
+    <div id="modalBulkGenerator" class="modal-overlay" onclick="closeModal('modalBulkGenerator')">
+        <div class="modal-card" style="max-width: 540px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; color: #818cf8;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3"></path>
+                    </svg>
+                    Bulk Key Generator
+                </h3>
+                <button class="btn btn-outline btn-sm" onclick="closeModal('modalBulkGenerator')">✕</button>
+            </div>
+            
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                Generate a batch of unique authorization keys in bulk. Keys are instantly saved to persistent storage and ready for distribution.
+            </p>
+
+            <!-- Batch Quantity -->
+            <div style="margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700; margin: 0;">Number of Keys to Generate</label>
+                    <span id="bulkModalQtyDisplay" style="font-size: 12px; font-weight: 800; color: #818cf8;">10 Keys</span>
+                </div>
+                <div class="duration-chips-scroll" id="bulkModalQtyChips">
+                    <button class="chip" data-bqty="5" onclick="selectBulkModalQty(5, this)">5 Keys</button>
+                    <button class="chip selected" data-bqty="10" onclick="selectBulkModalQty(10, this)">10 Keys</button>
+                    <button class="chip" data-bqty="25" onclick="selectBulkModalQty(25, this)">25 Keys</button>
+                    <button class="chip" data-bqty="50" onclick="selectBulkModalQty(50, this)">50 Keys</button>
+                    <button class="chip" data-bqty="100" onclick="selectBulkModalQty(100, this)">100 Keys</button>
+                </div>
+                <div style="margin-top: 8px;">
+                    <input type="number" id="inputBulkModalQty" class="form-input" min="1" max="100" value="10" placeholder="Custom quantity (1-100)" oninput="handleBulkModalQtyInput(this.value)" style="padding: 8px 12px; font-size: 13px;">
+                </div>
+            </div>
+
+            <!-- Validity Duration -->
+            <div style="margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700; margin: 0;">Validity Duration</label>
+                    <span id="bulkModalDurationDisplay" style="font-size: 12px; font-weight: 700; color: #93c5fd;">30 Days (30d)</span>
+                </div>
+                <div class="duration-chips-scroll" id="bulkModalDurationChips">
+                    <button class="chip" data-bhours="1" onclick="selectBulkModalDuration(1, this)">1h</button>
+                    <button class="chip" data-bhours="24" onclick="selectBulkModalDuration(24, this)">1d</button>
+                    <button class="chip" data-bhours="168" onclick="selectBulkModalDuration(168, this)">7d</button>
+                    <button class="chip selected" data-bhours="720" onclick="selectBulkModalDuration(720, this)">30d</button>
+                </div>
+            </div>
+
+            <!-- Prefix & Max Devices & Notes -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                <div>
+                    <label class="form-label" style="font-size: 11px;">Key Prefix</label>
+                    <input type="text" id="inputBulkPrefix" class="form-input" value="OPTIMIZER" style="padding: 8px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; font-weight: 700;">
+                </div>
+                <div>
+                    <label class="form-label" style="font-size: 11px;">Max Devices per Key</label>
+                    <input type="number" id="inputBulkMaxDevices" class="form-input" value="1" min="1" max="10" style="padding: 8px 12px; font-size: 13px;">
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label class="form-label" style="font-size: 11px;">Batch Reference Note (Optional)</label>
+                <input type="text" id="inputBulkNotes" class="form-input" placeholder="e.g. Bulk Distribution Batch #1" style="padding: 8px 12px; font-size: 13px;">
+            </div>
+
+            <div id="bulkModalErrorAlert" style="display: none; background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 14px;"></div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button class="btn btn-outline" onclick="closeModal('modalBulkGenerator')">Cancel</button>
+                <button class="btn btn-primary" id="btnSubmitBulkGenerate" onclick="submitBulkGeneratorModal()" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); border: none; font-weight: 800;">
+                    <span id="btnSubmitBulkText">⚡ Generate 10 Bulk Keys</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL: BULK GENERATION RESULTS             -->
+    <!-- ========================================== -->
+    <div id="modalBulkResults" class="modal-overlay" onclick="closeModal('modalBulkResults')">
+        <div class="modal-card" style="max-width: 620px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title" style="display: flex; align-items: center; gap: 8px; color: #34d399;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Bulk Keys Generated Successfully
+                </h3>
+                <button class="btn btn-outline btn-sm" onclick="closeModal('modalBulkResults')">✕</button>
+            </div>
+
+            <!-- Summary Badges -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+                <span class="user-badge" id="bulkResultCountBadge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35);">10 Keys Generated</span>
+                <span class="user-badge" id="bulkResultDurationBadge" style="background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.35);">30 Days Validity</span>
+                <span class="user-badge" id="bulkResultProductBadge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.35);">OPTIMIZER</span>
+            </div>
+
+            <!-- Bulk Action Buttons -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;">
+                <button class="btn btn-primary btn-sm" id="btnCopyAllBulkKeys" onclick="copyAllBulkKeys()" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span id="btnCopyAllBulkText">Copy All Keys</span>
+                </button>
+                <button class="btn btn-tonal btn-sm" onclick="downloadBulkKeysTxt()" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Download TXT
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="downloadBulkKeysJson()" style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    Download JSON
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="copyBulkKeysWithDetails()">
+                    Copy with Details
+                </button>
+            </div>
+
+            <!-- Scrollable List of Generated Keys -->
+            <div id="bulkResultsListContainer" style="max-height: 280px; overflow-y: auto; background: var(--bg-surface-variant); border: 1px solid var(--border-color); border-radius: 12px; padding: 10px; margin-bottom: 16px;">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; color: var(--text-muted);">Saved to 24/7 persistent storage</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-outline" onclick="closeModal('modalBulkResults')">Done</button>
+                    <button class="btn btn-tonal" onclick="viewBulkInTotalKeys()">View in Total Keys →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toastNotification" class="toast-notification">Notification message</div>
 
@@ -1455,9 +1632,13 @@
         // State variables
         let currentDashboard = 'OPTIMIZER';
         let selectedHours = 720; // Default to 30 Days (720h)
+        let selectedQuantity = 1; // Default to 1 key (Single)
         let selectedProduct = 'OPTIMIZER';
         let latestKeyData = null;
         let allKeys = [];
+        let lastGeneratedBulkKeys = [];
+        let bulkModalQuantity = 10;
+        let bulkModalDurationHours = 720;
         let currentStatusFilter = 'ALL';
         let searchQuery = '';
         let liveTickerInterval = null;
@@ -1957,7 +2138,11 @@
             const label = formatDurationLabel(selectedHours);
             const btnText = document.getElementById('btnGenerateKeyText');
             if (btnText) {
-                btnText.innerText = `Generate Key • ${currentDashboard} • ${label}`;
+                if (selectedQuantity > 1) {
+                    btnText.innerText = `⚡ Generate ${selectedQuantity} Bulk Keys • ${currentDashboard} • ${label}`;
+                } else {
+                    btnText.innerText = `Generate Key • ${currentDashboard} • ${label}`;
+                }
             }
         }
 
@@ -1978,6 +2163,58 @@
             const label = formatDurationLabel(hours);
             document.getElementById('selectedDurationLabel').innerText = label;
             updateGenerateBtnText();
+        }
+
+        // --- QUANTITY SELECTION FOR INLINE GENERATOR ---
+        function selectQuantity(qty, btn) {
+            selectedQuantity = Math.max(1, Math.min(parseInt(qty, 10) || 1, 100));
+            document.querySelectorAll('#quantityChipsRow .chip[data-qty]').forEach(c => {
+                c.classList.toggle('selected', parseInt(c.getAttribute('data-qty'), 10) === selectedQuantity);
+            });
+            const chipCustom = document.getElementById('chipCustomQty');
+            if (chipCustom) {
+                const isPreset = [1, 5, 10, 25, 50, 100].includes(selectedQuantity);
+                if (!isPreset) {
+                    chipCustom.classList.add('selected');
+                    chipCustom.innerText = `Custom (${selectedQuantity})`;
+                } else {
+                    chipCustom.innerText = 'Custom Qty';
+                    if (selectedQuantity === 1) {
+                        chipCustom.classList.remove('selected');
+                    }
+                }
+            }
+            const labelEl = document.getElementById('selectedQuantityLabel');
+            if (labelEl) {
+                labelEl.innerText = selectedQuantity === 1 ? 'Single (1 Key)' : `Bulk (${selectedQuantity} Keys)`;
+            }
+            updateGenerateBtnText();
+        }
+
+        function toggleCustomQtyInput(show) {
+            const wrap = document.getElementById('customQtyInputContainer');
+            if (!wrap) return;
+            if (show === undefined) {
+                show = wrap.style.display === 'none' || wrap.style.display === '';
+            }
+            wrap.style.display = show ? 'block' : 'none';
+            if (show) {
+                const input = document.getElementById('inputCustomQty');
+                if (input) {
+                    input.value = selectedQuantity > 1 ? selectedQuantity : 15;
+                    input.focus();
+                }
+            }
+        }
+
+        function applyCustomQuantity() {
+            const val = parseInt(document.getElementById('inputCustomQty').value, 10);
+            if (isNaN(val) || val < 1 || val > 100) {
+                alert('Please enter a valid key quantity between 1 and 100.');
+                return;
+            }
+            selectQuantity(val, null);
+            toggleCustomQtyInput(false);
         }
 
         function openCustomHoursModal() {
@@ -2009,12 +2246,12 @@
             closeModal('modalCustomHours');
         }
 
-        // --- KEY GENERATION ---
+        // --- KEY GENERATION (SINGLE & BULK) ---
         async function handleGenerateKey() {
             const btn = document.getElementById('btnGenerateKey');
             const btnText = document.getElementById('btnGenerateKeyText');
             btn.disabled = true;
-            btnText.innerText = 'Generating Cryptographic Key...';
+            btnText.innerText = selectedQuantity > 1 ? `Generating ${selectedQuantity} Bulk Keys...` : 'Generating Cryptographic Key...';
 
             const maxDevices = parseInt(document.getElementById('inputMaxDevices').value, 10) || 1;
             const notes = document.getElementById('inputCustomerNotes').value.trim();
@@ -2029,36 +2266,43 @@
                         max_devices: maxDevices,
                         customer_name: notes || null,
                         notes: notes || '',
-                        prefix: prefixVal
+                        prefix: prefixVal,
+                        count: selectedQuantity
                     })
                 });
 
-                if (res.success && (res.key || (res.keys && res.keys[0]))) {
-                    const generated = (res.keys && res.keys[0]) ? res.keys[0] : (typeof res.key === 'object' ? res.key : res);
-                    latestKeyData = {
-                        id: generated.id,
-                        key_display: generated.key_display || generated.key,
-                        product_name: generated.product_name || generated.product || currentDashboard,
-                        status: generated.status || 'UNUSED',
-                        duration_hours: generated.duration_hours,
-                        created_at: generated.created_at || new Date().toISOString(),
-                        activated_at: generated.activated_at || null,
-                        expires_at: generated.expires_at || null,
-                        max_devices: generated.max_devices || maxDevices,
-                        customer_name: generated.customer_name || null,
-                        notes: generated.notes || notes
-                    };
+                if (res.success && (res.key || (res.keys && res.keys.length > 0))) {
+                    const newlyCreated = (res.keys && res.keys.length > 0) ? res.keys : [res.key];
+                    const processedKeys = [];
 
+                    for (let i = 0; i < newlyCreated.length; i++) {
+                        const generated = newlyCreated[i];
+                        const keyObj = {
+                            id: generated.id,
+                            key_display: generated.key_display || generated.key,
+                            product_name: generated.product_name || generated.product || currentDashboard,
+                            status: generated.status || 'UNUSED',
+                            duration_hours: generated.duration_hours || selectedHours,
+                            created_at: generated.created_at || new Date().toISOString(),
+                            activated_at: generated.activated_at || null,
+                            expires_at: generated.expires_at || null,
+                            max_devices: generated.max_devices || maxDevices,
+                            customer_name: generated.customer_name || null,
+                            notes: generated.notes || notes
+                        };
+                        processedKeys.push(keyObj);
+
+                        const existingIdx = allKeys.findIndex(k => String(k.id) === String(keyObj.id) || k.key_display === keyObj.key_display);
+                        if (existingIdx !== -1) {
+                            allKeys[existingIdx] = { ...allKeys[existingIdx], ...keyObj };
+                        } else {
+                            allKeys.unshift(keyObj);
+                        }
+                    }
+
+                    latestKeyData = processedKeys[0];
                     saveLatestKey(latestKeyData);
                     renderLatestKey(latestKeyData);
-
-                    // Prepend to allKeys list immediately so it appears across dashboard tabs
-                    const existingIdx = allKeys.findIndex(k => String(k.id) === String(latestKeyData.id) || k.key_display === latestKeyData.key_display);
-                    if (existingIdx !== -1) {
-                        allKeys[existingIdx] = { ...allKeys[existingIdx], ...latestKeyData };
-                    } else {
-                        allKeys.unshift(latestKeyData);
-                    }
                     saveAllKeys(allKeys);
 
                     // Ensure Total Keys filter chip is set to ALL so newly generated keys are always immediately visible
@@ -2071,10 +2315,16 @@
                     renderHistoryList();
                     updateStatsForCurrentDashboard();
 
-                    showToast('Key generated successfully! Saved to persistent storage.');
                     loadStatsData();
                     loadKeysData();
-                    openKeyDetails(latestKeyData);
+
+                    if (selectedQuantity > 1) {
+                        showToast(`${newlyCreated.length} keys generated successfully! Saved to persistent storage.`);
+                        openBulkResultsModal(processedKeys);
+                    } else {
+                        showToast('Key generated successfully! Saved to persistent storage.');
+                        openKeyDetails(latestKeyData);
+                    }
                 } else {
                     alert(res.message || 'Failed to generate key.');
                 }
@@ -2084,6 +2334,276 @@
                 btn.disabled = false;
                 updateGenerateBtnText();
             }
+        }
+
+        // --- DEDICATED BULK GENERATOR MODAL LOGIC ---
+        function openBulkGeneratorModal() {
+            bulkModalQuantity = 10;
+            bulkModalDurationHours = selectedHours || 720;
+            const inputQty = document.getElementById('inputBulkModalQty');
+            if (inputQty) inputQty.value = bulkModalQuantity;
+            updateBulkModalUI();
+            const errAlert = document.getElementById('bulkModalErrorAlert');
+            if (errAlert) errAlert.style.display = 'none';
+            const inputPrefix = document.getElementById('inputBulkPrefix');
+            if (inputPrefix) {
+                const mainPrefix = document.getElementById('inputKeyPrefix')?.value?.trim();
+                inputPrefix.value = mainPrefix || 'OPTIMIZER';
+            }
+            const inputMaxDev = document.getElementById('inputBulkMaxDevices');
+            if (inputMaxDev) {
+                const mainMax = document.getElementById('inputMaxDevices')?.value;
+                inputMaxDev.value = mainMax || '1';
+            }
+            const inputNotes = document.getElementById('inputBulkNotes');
+            if (inputNotes) inputNotes.value = '';
+            openModal('modalBulkGenerator');
+        }
+
+        function updateBulkModalUI() {
+            document.querySelectorAll('#bulkModalQtyChips .chip[data-bqty]').forEach(c => {
+                c.classList.toggle('selected', parseInt(c.getAttribute('data-bqty'), 10) === bulkModalQuantity);
+            });
+            document.querySelectorAll('#bulkModalDurationChips .chip[data-bhours]').forEach(c => {
+                c.classList.toggle('selected', parseInt(c.getAttribute('data-bhours'), 10) === bulkModalDurationHours);
+            });
+            const qtyDisplay = document.getElementById('bulkModalQtyDisplay');
+            if (qtyDisplay) qtyDisplay.innerText = `${bulkModalQuantity} Keys`;
+            const durDisplay = document.getElementById('bulkModalDurationDisplay');
+            if (durDisplay) durDisplay.innerText = formatDurationLabel(bulkModalDurationHours);
+            const btnText = document.getElementById('btnSubmitBulkText');
+            if (btnText) btnText.innerText = `⚡ Generate ${bulkModalQuantity} Bulk Keys`;
+        }
+
+        function selectBulkModalQty(qty, btn) {
+            bulkModalQuantity = Math.max(1, Math.min(parseInt(qty, 10) || 1, 100));
+            const input = document.getElementById('inputBulkModalQty');
+            if (input) input.value = bulkModalQuantity;
+            updateBulkModalUI();
+        }
+
+        function handleBulkModalQtyInput(val) {
+            const parsed = parseInt(val, 10);
+            if (!isNaN(parsed) && parsed >= 1 && parsed <= 100) {
+                bulkModalQuantity = parsed;
+            }
+            updateBulkModalUI();
+        }
+
+        function selectBulkModalDuration(hours, btn) {
+            bulkModalDurationHours = hours;
+            updateBulkModalUI();
+        }
+
+        async function submitBulkGeneratorModal() {
+            const btn = document.getElementById('btnSubmitBulkGenerate');
+            const btnText = document.getElementById('btnSubmitBulkText');
+            const errAlert = document.getElementById('bulkModalErrorAlert');
+            if (errAlert) errAlert.style.display = 'none';
+
+            const qty = Math.max(1, Math.min(parseInt(document.getElementById('inputBulkModalQty').value, 10) || 10, 100));
+            const prefix = document.getElementById('inputBulkPrefix')?.value?.trim() || 'OPTIMIZER';
+            const maxDevices = parseInt(document.getElementById('inputBulkMaxDevices')?.value, 10) || 1;
+            const notes = document.getElementById('inputBulkNotes')?.value?.trim() || '';
+
+            btn.disabled = true;
+            const originalText = btnText.innerText;
+            btnText.innerText = `Generating ${qty} Keys...`;
+
+            try {
+                const res = await api('/api/keys/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        product_name: currentDashboard,
+                        duration_hours: bulkModalDurationHours,
+                        max_devices: maxDevices,
+                        customer_name: notes || null,
+                        notes: notes,
+                        prefix: prefix,
+                        count: qty
+                    })
+                });
+
+                if (res.success && (res.key || (res.keys && res.keys.length > 0))) {
+                    const newlyCreated = (res.keys && res.keys.length > 0) ? res.keys : [res.key];
+                    const processedKeys = [];
+
+                    for (let i = 0; i < newlyCreated.length; i++) {
+                        const generated = newlyCreated[i];
+                        const keyObj = {
+                            id: generated.id,
+                            key_display: generated.key_display || generated.key,
+                            product_name: generated.product_name || generated.product || currentDashboard,
+                            status: generated.status || 'UNUSED',
+                            duration_hours: generated.duration_hours || bulkModalDurationHours,
+                            created_at: generated.created_at || new Date().toISOString(),
+                            activated_at: generated.activated_at || null,
+                            expires_at: generated.expires_at || null,
+                            max_devices: generated.max_devices || maxDevices,
+                            customer_name: generated.customer_name || null,
+                            notes: generated.notes || notes
+                        };
+                        processedKeys.push(keyObj);
+
+                        const existingIdx = allKeys.findIndex(k => String(k.id) === String(keyObj.id) || k.key_display === keyObj.key_display);
+                        if (existingIdx !== -1) {
+                            allKeys[existingIdx] = { ...allKeys[existingIdx], ...keyObj };
+                        } else {
+                            allKeys.unshift(keyObj);
+                        }
+                    }
+
+                    latestKeyData = processedKeys[0];
+                    saveLatestKey(latestKeyData);
+                    renderLatestKey(latestKeyData);
+                    saveAllKeys(allKeys);
+
+                    currentStatusFilter = 'ALL';
+                    document.querySelectorAll('#tabContentTotalKeys .chip[data-status]').forEach(c => {
+                        c.classList.toggle('selected', c.getAttribute('data-status') === 'ALL');
+                    });
+
+                    renderKeysList();
+                    renderHistoryList();
+                    updateStatsForCurrentDashboard();
+                    loadStatsData();
+                    loadKeysData();
+
+                    closeModal('modalBulkGenerator');
+                    showToast(`${newlyCreated.length} bulk keys generated successfully! Saved to persistent storage.`);
+                    openBulkResultsModal(processedKeys);
+                } else {
+                    if (errAlert) {
+                        errAlert.innerText = res.message || 'Failed to generate bulk keys.';
+                        errAlert.style.display = 'block';
+                    } else {
+                        alert(res.message || 'Failed to generate bulk keys.');
+                    }
+                }
+            } catch (err) {
+                if (errAlert) {
+                    errAlert.innerText = 'Error: ' + err.message;
+                    errAlert.style.display = 'block';
+                } else {
+                    alert('Error: ' + err.message);
+                }
+            } finally {
+                btn.disabled = false;
+                btnText.innerText = originalText;
+            }
+        }
+
+        // --- BULK RESULTS MODAL LOGIC ---
+        function openBulkResultsModal(keysList) {
+            lastGeneratedBulkKeys = keysList || [];
+            const countBadge = document.getElementById('bulkResultCountBadge');
+            if (countBadge) countBadge.innerText = `${lastGeneratedBulkKeys.length} Keys Generated`;
+
+            const firstKey = lastGeneratedBulkKeys[0] || {};
+            const durBadge = document.getElementById('bulkResultDurationBadge');
+            if (durBadge) durBadge.innerText = `${formatDurationLabel(firstKey.duration_hours || selectedHours)} Validity`;
+
+            const prodBadge = document.getElementById('bulkResultProductBadge');
+            if (prodBadge) prodBadge.innerText = firstKey.product_name || currentDashboard;
+
+            const container = document.getElementById('bulkResultsListContainer');
+            if (container) {
+                container.innerHTML = lastGeneratedBulkKeys.map((k, idx) => `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-bottom: 1px solid var(--border-color); gap: 8px; font-size: 13px;">
+                        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-muted); width: 26px;">#${idx + 1}</span>
+                            <span class="key-text-mono" style="color: #93c5fd; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${k.key_display || k.key}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="status-badge status-badge-non-active" style="font-size: 10px; padding: 2px 6px;">NON-ACTIVE</span>
+                            <button class="btn btn-outline btn-sm" style="padding: 4px 8px; font-size: 11px;" onclick="copyToClipboard('${k.key_display || k.key}', 'Key #${idx + 1}')">Copy</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            openModal('modalBulkResults');
+        }
+
+        function copyAllBulkKeys() {
+            if (!lastGeneratedBulkKeys || lastGeneratedBulkKeys.length === 0) return;
+            const text = lastGeneratedBulkKeys.map(k => k.key_display || k.key).join('\n');
+            copyToClipboard(text, 'All bulk keys');
+            const btnText = document.getElementById('btnCopyAllBulkText');
+            if (btnText) {
+                const orig = btnText.innerText;
+                btnText.innerText = '✓ Copied All!';
+                setTimeout(() => { btnText.innerText = orig; }, 2000);
+            }
+        }
+
+        function copyBulkKeysWithDetails() {
+            if (!lastGeneratedBulkKeys || lastGeneratedBulkKeys.length === 0) return;
+            const lines = lastGeneratedBulkKeys.map((k, i) => {
+                const key = k.key_display || k.key;
+                const dur = formatDurationLabel(k.duration_hours);
+                const prod = k.product_name || currentDashboard;
+                const note = k.notes ? ` | Note: ${k.notes}` : '';
+                return `${i + 1}. Key: ${key} | Product: ${prod} | Validity: ${dur} | Devices: ${k.max_devices || 1}${note}`;
+            });
+            copyToClipboard(lines.join('\n'), 'Bulk keys with details');
+        }
+
+        function downloadBulkKeysTxt() {
+            if (!lastGeneratedBulkKeys || lastGeneratedBulkKeys.length === 0) return;
+            const first = lastGeneratedBulkKeys[0] || {};
+            const dateStr = new Date().toISOString();
+            let content = `=======================================================\n`;
+            content += `AZEROX OPTIMIZER - BULK KEYS EXPORT\n`;
+            content += `Generated: ${dateStr}\n`;
+            content += `Product: ${first.product_name || currentDashboard}\n`;
+            content += `Validity: ${formatDurationLabel(first.duration_hours)}\n`;
+            content += `Total Keys: ${lastGeneratedBulkKeys.length}\n`;
+            content += `=======================================================\n\n`;
+
+            lastGeneratedBulkKeys.forEach((k, idx) => {
+                content += `${idx + 1}. ${k.key_display || k.key}\n`;
+            });
+
+            content += `\n=======================================================\n`;
+            content += `Keep these keys secure. Unactivated keys do not expire.\n`;
+            content += `=======================================================\n`;
+
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `optimizer-bulk-keys-${Date.now()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Downloaded keys as TXT file!');
+        }
+
+        function downloadBulkKeysJson() {
+            if (!lastGeneratedBulkKeys || lastGeneratedBulkKeys.length === 0) return;
+            const exportData = {
+                exported_at: new Date().toISOString(),
+                product: (lastGeneratedBulkKeys[0] || {}).product_name || currentDashboard,
+                count: lastGeneratedBulkKeys.length,
+                keys: lastGeneratedBulkKeys
+            };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `optimizer-bulk-keys-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('Downloaded keys as JSON file!');
+        }
+
+        function viewBulkInTotalKeys() {
+            closeModal('modalBulkResults');
+            switchTab('TOTAL_KEYS', 'ALL');
         }
 
         // --- LATEST KEY RENDERING & ACTIONS ---

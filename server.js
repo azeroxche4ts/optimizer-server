@@ -347,7 +347,7 @@ async function handleKeyGeneration(req, res) {
 
         const product = await db.getOrCreateProduct(product_name);
         const generatedKeys = [];
-        const limitCount = Math.min(Math.max(parseInt(count, 10) || 1, 1), 50);
+        const limitCount = Math.min(Math.max(parseInt(count, 10) || 1, 1), 100);
         const resolvedPrefix = prefix || 'OPTIMIZER';
 
         for (let i = 0; i < limitCount; i++) {

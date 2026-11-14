@@ -338,6 +338,28 @@ test('Comprehensive Function & Route Suite', async (t) => {
         assert.strictEqual(listRes.status, 200);
         assert.ok(listRes.body.keys.some(k => k.key_display === generatedKey.key_display));
 
+        // Bulk Key Generation (5 keys)
+        const bulkGenRes = await makeRequest(server, {
+            path: '/api/keys/generate',
+            method: 'POST',
+            headers: testAdminHeader(),
+            body: {
+                product_name: 'OPTIMIZE',
+                duration_hours: 720,
+                max_devices: 1,
+                count: 5,
+                prefix: 'BULK'
+            }
+        });
+        assert.strictEqual(bulkGenRes.status, 200);
+        assert.strictEqual(bulkGenRes.body.success, true);
+        assert.strictEqual(bulkGenRes.body.keys.length, 5);
+        for (const k of bulkGenRes.body.keys) {
+            assert.ok(k.key.startsWith('BULK-'), 'Each bulk key must start with prefix BULK');
+            assert.strictEqual(k.duration_hours, 720);
+            assert.strictEqual(k.status, 'UNUSED');
+        }
+
         // Get single key
         const singleRes = await makeRequest(server, {
             path: `/api/keys/${generatedKey.id}`,

@@ -181,5 +181,8 @@ test('Key Management & 24/7 Restart Persistence Test Suite', async (t) => {
         assert.ok(html.includes('azerox_optimizer_latest_key_v2'), 'index.html must use persistent storage key for latest generated key');
         assert.ok(html.includes('azerox_optimizer_all_keys_v2'), 'index.html must use persistent storage key for all keys');
         assert.ok(html.includes('downloadKeysBackup'), 'index.html must include downloadKeysBackup function');
+        assert.ok(html.includes('openBulkGeneratorModal'), 'index.html must include openBulkGeneratorModal function');
+        assert.ok(html.includes('copyAllBulkKeys'), 'index.html must include copyAllBulkKeys function');
+        assert.ok(html.includes('modalBulkGenerator'), 'index.html must include modalBulkGenerator');
     });
 });

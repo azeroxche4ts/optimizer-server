@@ -710,4 +710,50 @@ test('Key Management & UI Test Suite', async (t) => {
             'Switching to ALL shows the generated key again'
         );
     });
+
+    await t.test('11. Bulk Key Generation: generates batch of keys up to 100, persists them, and validates bulk UI flows', async () => {
+        // Test API bulk generation of 12 keys
+        const bulkRes = await makeRequest(server, {
+            path: '/api/keys/generate',
+            method: 'POST',
+            headers: testAdminHeader(),
+            body: {
+                product_name: 'OPTIMIZE',
+                duration_hours: 24,
+                count: 12,
+                prefix: 'BATCH'
+            }
+        });
+        assert.strictEqual(bulkRes.status, 200);
+        assert.strictEqual(bulkRes.body.success, true);
+        assert.strictEqual(bulkRes.body.keys.length, 12);
+        for (const k of bulkRes.body.keys) {
+            assert.ok(k.key.startsWith('BATCH-'), 'Key must start with prefix BATCH');
+            assert.strictEqual(k.duration_hours, 24);
+            assert.strictEqual(k.status, 'UNUSED');
+        }
+
+        // Test max count boundary: requesting 150 clamps to 100
+        const clampedRes = await makeRequest(server, {
+            path: '/api/keys/generate',
+            method: 'POST',
+            headers: testAdminHeader(),
+            body: {
+                product_name: 'OPTIMIZE',
+                duration_hours: 24,
+                count: 150,
+                prefix: 'MAX'
+            }
+        });
+        assert.strictEqual(clampedRes.status, 200);
+        assert.strictEqual(clampedRes.body.keys.length, 100, 'Bulk key generation must clamp count to 100');
+
+        // Cleanup generated test keys
+        for (const k of bulkRes.body.keys) {
+            await db.deleteKey(k.id, 'test');
+        }
+        for (const k of clampedRes.body.keys) {
+            await db.deleteKey(k.id, 'test');
+        }
+    });
 });
